@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firma del Tutor - Coformación</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background-color: #f4f4f9; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 400px; width: 100%; }
+        h2 { color: #333; text-align: center; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        canvas { border: 2px dashed #999; background: #fff; cursor: crosshair; touch-action: none; width: 100%; height: 200px; }
+        .buttons { margin-top: 15px; display: flex; gap: 10px; }
+        button { flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn-clear { background-color: #e74c3c; color: white; }
+        .btn-save { background-color: #2ecc71; color: white; }
+        #status { margin-top: 15px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Registro de Firma</h2>
+    <label for="codigo">Código del Acta (ej. ACT-2025-001):</label>
+    <input type="text" id="codigo" placeholder="Ingresa el código" required>
+
+    <label>Dibuja tu firma abajo:</label>
+    <canvas id="signature-pad"></canvas>
+
+    <div class="buttons">
+        <button class="btn-clear" onclick="clearCanvas()">Limpiar</button>
+        <button class="btn-save" onclick="saveSignature()">Registrar Firma</button>
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script>
+    // PASO 7.2: REEMPLAZA ESTA URL CON TU URL DE APPS SCRIPT [cite: 152, 155]
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOVBPKleXp7Xdu1qKLcXc3NdaLnV6jauwbxU474QQKcKR4jukUhRLnqK6Vm-SLp9fL/exec';
+
+    const canvas = document.getElementById('signature-pad');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    // Configuración del trazo
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000';
+
+    // Ajustar resolución del canvas
+    function resizeCanvas() {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        ctx.scale(ratio, ratio);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Eventos de ratón y táctiles
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    canvas.addEventListener('mousedown', (e) => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); });
+    canvas.addEventListener('mousemove', (e) => { if(!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); });
+    window.addEventListener('mouseup', () => drawing = false);
+
+    canvas.addEventListener('touchstart', (e) => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); }, {passive: false});
+    canvas.addEventListener('touchmove', (e) => { if(!drawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); }, {passive: false});
+
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        document.getElementById('status').innerText = "";
+    }
+
+    async function saveSignature() {
+        const codigo = document.getElementById('codigo').value.trim();
+        const status = document.getElementById('status');
+
+        if (!codigo) {
+            status.style.color = "red";
+            status.innerText = "Error: Debes ingresar el código del acta.";
+            return;
+        }
+
+        // Convertir firma a base64
+        const dataURL = canvas.toDataURL('image/png');
+        const base64Image = dataURL.split(',')[1];
+
+        status.style.color = "blue";
+        status.innerText = "Enviando firma... por favor espera.";
+
+        try {
+            const response = await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // Necesario para Apps Script Web App
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sign', codigo: codigo, image: base64Image })
+            });
+
+            status.style.color = "green";
+            status.innerText = "✅ Firma registrada correctamente.";
+            clearCanvas();
+        } catch (error) {
+            status.style.color = "red";
+            status.innerText = "Error al conectar con el servidor.";
+            console.error(error);
+        }
+    }
+</script>
+
+</body>
+</html>
